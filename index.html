@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mon Poids">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <title>Suivi de poids</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --accent: #0f3460;
+            --highlight: #e94560;
+            --text: #eee;
+            --text-dim: #8899aa;
+            --green: #4ecca3;
+            --red: #e94560;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 16px 10px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            padding: 10px 16px 16px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .stat-diff {
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .stat-diff.down { color: var(--green); }
+        .stat-diff.up { color: var(--red); }
+        .stat-diff.neutral { color: var(--text-dim); }
+
+        .chart-container {
+            background: var(--card);
+            border-radius: 16px;
+            margin: 0 12px;
+            padding: 16px 8px 8px;
+        }
+
+        .period-selector {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .period-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--text-dim);
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .period-btn.active {
+            background: var(--highlight);
+            border-color: var(--highlight);
+            color: white;
+        }
+
+        canvas { width: 100% !important; }
+
+        .input-section {
+            margin: 16px 12px;
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-row input[type="number"] {
+            flex: 1;
+            background: var(--accent);
+            border: none;
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            padding: 14px 16px;
+            border-radius: 12px;
+            text-align: center;
+            -webkit-appearance: none;
+        }
+
+        .input-row input[type="number"]::placeholder {
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .input-row input[type="date"] {
+            background: var(--accent);
+            border: none;
+            color: white;
+            font-size: 14px;
+            padding: 14px 12px;
+            border-radius: 12px;
+            -webkit-appearance: none;
+        }
+
+        .btn-add {
+            background: var(--highlight);
+            border: none;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 54px;
+            flex-shrink: 0;
+            transition: transform 0.1s;
+        }
+
+        .btn-add:active { transform: scale(0.95); }
+
+        .history {
+            margin: 16px 12px 30px;
+        }
+
+        .history h3 {
+            font-size: 15px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+
+        .history-list {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .history-item:last-child { border-bottom: none; }
+
+        .history-date {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        .history-weight {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .history-change {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .history-change.down { background: rgba(78,204,163,0.15); color: var(--green); }
+        .history-change.up { background: rgba(233,69,96,0.15); color: var(--red); }
+        .history-change.neutral { background: rgba(136,153,170,0.15); color: var(--text-dim); }
+
+        .history-delete {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            opacity: 0.5;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; line-height: 1.5; }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--green);
+            color: #111;
+            padding: 10px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        .export-section {
+            text-align: center;
+            padding: 0 12px 30px;
+        }
+
+        .btn-export {
+            background: var(--accent);
+            border: none;
+            color: var(--text-dim);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Suivi de poids</h1>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="chart-container">
+        <div class="period-selector">
+            <button class="period-btn" data-period="7">7j</button>
+            <button class="period-btn active" data-period="30">30j</button>
+            <button class="period-btn" data-period="90">3m</button>
+            <button class="period-btn" data-period="365">1an</button>
+            <button class="period-btn" data-period="0">Tout</button>
+        </div>
+        <canvas id="chart" height="200"></canvas>
+    </div>
+
+    <div class="input-section">
+        <div class="input-row">
+            <input type="date" id="dateInput">
+            <input type="number" id="weightInput" placeholder="kg" step="0.1" min="20" max="300" inputmode="decimal">
+            <button class="btn-add" id="addBtn">+</button>
+        </div>
+    </div>
+
+    <div class="history">
+        <h3>Historique</h3>
+        <div class="history-list" id="historyList"></div>
+    </div>
+
+    <div class="export-section">
+        <button class="btn-export" id="exportBtn">Exporter CSV</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script>
+(function () {
+    const STORAGE_KEY = 'poids-tracker-data';
+
+    function loadData() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        } catch {
+            return [];
+        }
+    }
+
+    function saveData(data) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function formatDate(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    }
+
+    function formatDateLong(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function todayStr() {
+        return new Date().toISOString().slice(0, 10);
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    let chart = null;
+    let currentPeriod = 30;
+
+    function buildChart(data, days) {
+        const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+        let filtered = sorted;
+        if (days > 0) {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - days);
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            filtered = sorted.filter(d => d.date >= cutoffStr);
+        }
+
+        const labels = filtered.map(d => d.date);
+        const values = filtered.map(d => d.weight);
+        const ctx = document.getElementById('chart').getContext('2d');
+
+        if (chart) chart.destroy();
+
+        if (filtered.length === 0) {
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [''], datasets: [{ data: [0] }] },
+                options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+            });
+            return;
+        }
+
+        const minW = Math.min(...values);
+        const maxW = Math.max(...values);
+        const padding = Math.max((maxW - minW) * 0.15, 0.5);
+
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    borderColor: '#e94560',
+                    backgroundColor: 'rgba(233, 69, 96, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: filtered.length > 60 ? 0 : 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#e94560',
+                    borderWidth: 2.5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#16213e',
+                        titleColor: '#8899aa',
+                        bodyColor: '#eee',
+                        bodyFont: { size: 16, weight: 'bold' },
+                        padding: 10,
+                        cornerRadius: 10,
+                        displayColors: false,
+                        callbacks: {
+                            title: (items) => formatDateLong(items[0].label),
+                            label: (item) => item.parsed.y.toFixed(1) + ' kg'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        ticks: {
+                            color: '#8899aa',
+                            font: { size: 11 },
+                            maxTicksLimit: 6,
+                            callback: (val, i) => formatDate(labels[i])
+                        },
+                        grid: { display: false }
+                    },
+                    y: {
+                        min: minW - padding,
+                        max: maxW + padding,
+                        ticks: {
+                            color: '#8899aa',
+                            font: { size: 11 },
+                            callback: v => v.toFixed(1)
+                        },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    }
+                },
+                interaction: { intersect: false, mode: 'index' }
+            }
+        });
+    }
+
+    function updateStats(data) {
+        const container = document.getElementById('stats');
+        if (data.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+        const latest = sorted[sorted.length - 1];
+        const first = sorted[0];
+        const diff = latest.weight - first.weight;
+        const diffClass = diff < 0 ? 'down' : diff > 0 ? 'up' : 'neutral';
+        const diffSign = diff > 0 ? '+' : '';
+
+        let weekDiff = null;
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const weekStr = weekAgo.toISOString().slice(0, 10);
+        const weekEntry = sorted.filter(d => d.date <= weekStr).pop();
+        if (weekEntry) {
+            weekDiff = latest.weight - weekEntry.weight;
+        }
+
+        container.innerHTML = `
+            <div class="stat">
+                <div class="stat-value">${latest.weight.toFixed(1)}</div>
+                <div class="stat-label">Actuel (kg)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${diff > 0 ? '+' : ''}${diff.toFixed(1)}</div>
+                <div class="stat-label">Total</div>
+                <div class="stat-diff ${diffClass}">${diffSign}${diff.toFixed(1)} kg</div>
+            </div>
+            ${weekDiff !== null ? `
+            <div class="stat">
+                <div class="stat-value">${weekDiff > 0 ? '+' : ''}${weekDiff.toFixed(1)}</div>
+                <div class="stat-label">7 jours</div>
+                <div class="stat-diff ${weekDiff < 0 ? 'down' : weekDiff > 0 ? 'up' : 'neutral'}">${weekDiff > 0 ? '+' : ''}${weekDiff.toFixed(1)} kg</div>
+            </div>` : ''}
+        `;
+    }
+
+    function renderHistory(data) {
+        const container = document.getElementById('historyList');
+        const sorted = [...data].sort((a, b) => b.date.localeCompare(a.date));
+
+        if (sorted.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">&#9878;</div>
+                    <p>Aucune mesure enregistree.<br>Ajoutez votre poids ci-dessus.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = sorted.slice(0, 30).map((entry, i) => {
+            let changeHtml = '';
+            const nextIdx = sorted.findIndex((e, j) => j > i);
+            if (nextIdx >= 0) {
+                const diff = entry.weight - sorted[nextIdx].weight;
+                const cls = diff < 0 ? 'down' : diff > 0 ? 'up' : 'neutral';
+                const sign = diff > 0 ? '+' : '';
+                changeHtml = `<span class="history-change ${cls}">${sign}${diff.toFixed(1)}</span>`;
+            }
+
+            return `
+                <div class="history-item" data-date="${entry.date}">
+                    <span class="history-date">${formatDateLong(entry.date)}</span>
+                    <span class="history-weight">${entry.weight.toFixed(1)} kg</span>
+                    ${changeHtml}
+                    <button class="history-delete" data-date="${entry.date}">&times;</button>
+                </div>`;
+        }).join('');
+    }
+
+    function refresh() {
+        const data = loadData();
+        updateStats(data);
+        buildChart(data, currentPeriod);
+        renderHistory(data);
+    }
+
+    function init() {
+        const dateInput = document.getElementById('dateInput');
+        dateInput.value = todayStr();
+
+        document.getElementById('addBtn').addEventListener('click', () => {
+            const weightInput = document.getElementById('weightInput');
+            const weight = parseFloat(weightInput.value);
+            const date = dateInput.value;
+
+            if (!weight || weight < 20 || weight > 300) {
+                showToast('Poids invalide');
+                return;
+            }
+            if (!date) {
+                showToast('Date invalide');
+                return;
+            }
+
+            const data = loadData();
+            const existing = data.findIndex(d => d.date === date);
+            if (existing >= 0) {
+                data[existing].weight = weight;
+            } else {
+                data.push({ date, weight });
+            }
+
+            saveData(data);
+            weightInput.value = '';
+            dateInput.value = todayStr();
+            showToast('Enregistre !');
+            refresh();
+        });
+
+        document.getElementById('weightInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('addBtn').click();
+        });
+
+        document.getElementById('historyList').addEventListener('click', (e) => {
+            if (e.target.classList.contains('history-delete')) {
+                const date = e.target.dataset.date;
+                const data = loadData().filter(d => d.date !== date);
+                saveData(data);
+                showToast('Supprime');
+                refresh();
+            }
+        });
+
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentPeriod = parseInt(btn.dataset.period);
+                buildChart(loadData(), currentPeriod);
+            });
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const data = loadData();
+            if (data.length === 0) {
+                showToast('Aucune donnee');
+                return;
+            }
+            const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+            let csv = 'Date,Poids (kg)\n';
+            sorted.forEach(d => csv += `${d.date},${d.weight}\n`);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `poids-${todayStr()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exporte');
+        });
+
+        refresh();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+})();
+    </script>
+</body>
+</html>
